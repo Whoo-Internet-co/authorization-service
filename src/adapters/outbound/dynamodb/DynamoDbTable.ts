@@ -1,7 +1,6 @@
-import type { Contrato } from '../../domain/entities/Contrato';
-import { Contrato } from '../../domain/entities/Contrato';
-import type { Autorizacao } from '../../domain/entities/Autorizacao';
-import { TransacaoAutorizada } from '../../domain/events/TransacaoAutorizada';
+import { Contrato } from '../../../domain/entities/Contrato';
+import type { Autorizacao } from '../../../domain/entities/Autorizacao';
+import { TransacaoAutorizada } from '../../../domain/events/TransacaoAutorizada';
 
 /**
  * Modelagem DynamoDB — decisão documentada (ver README).

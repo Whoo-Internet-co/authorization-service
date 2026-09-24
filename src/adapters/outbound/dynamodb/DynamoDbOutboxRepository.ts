@@ -1,4 +1,4 @@
-import { PutItemCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import type { TransacaoAutorizada } from '../../../domain/events/TransacaoAutorizada';
 import type { OutboxRepository } from '../../../application/ports/OutboxRepository';
@@ -20,7 +20,7 @@ export class DynamoDbOutboxRepository implements OutboxRepository {
 
   async append(event: TransacaoAutorizada): Promise<void> {
     await this.doc.send(
-      new PutItemCommand({
+      new PutCommand({
         TableName: this.tableName,
         Item: buildOutboxItem(event),
         ConditionExpression: 'attribute_not_exists(PK)',

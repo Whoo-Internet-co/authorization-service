@@ -1,9 +1,10 @@
-import {
-  GetItemCommand,
-  TransactWriteItemsCommand,
-  type TransactWriteItem,
+import { GetCommand, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
+import type {
+  DynamoDBDocumentClient,
+  TransactWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
-import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+
+type TransactWriteItem = NonNullable<TransactWriteCommandInput['TransactItems']>[number];
 import type { Contrato } from '../../../domain/entities/Contrato';
 import {
   ConflitoConcorrenciaError,
@@ -52,7 +53,7 @@ export class DynamoDbLimitRepository implements LimitRepository {
 
   async findById(idContrato: string): Promise<Contrato | null> {
     const result = await this.doc.send(
-      new GetItemCommand({
+      new GetCommand({
         TableName: this.tableName,
         Key: contractKey(idContrato),
         ConsistentRead: true,
@@ -120,7 +121,7 @@ export class DynamoDbLimitRepository implements LimitRepository {
 
     try {
       await this.doc.send(
-        new TransactWriteItemsCommand({
+        new TransactWriteCommand({
           TransactItems: [
             contractUpdate,
             authorizationPut,

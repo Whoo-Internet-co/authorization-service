@@ -1,4 +1,4 @@
-import { GetItemCommand, PutItemCommand, UpdateItemCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import type { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import type {
   AcquireIdempotencyResult,
@@ -54,7 +54,7 @@ export class DynamoDbIdempotencyRepository implements IdempotencyRepository {
     const ttlEpoch = Math.floor(now.getTime() / 1000) + ttlSeconds;
     try {
       await this.doc.send(
-        new PutItemCommand({
+        new PutCommand({
           TableName: this.tableName,
           Item: buildIdempotencyItem({ chave, requestHash, status: 'EM_ANDAMENTO', ttl: ttlEpoch, now }),
           ConditionExpression: 'attribute_not_exists(PK)',
@@ -86,7 +86,7 @@ export class DynamoDbIdempotencyRepository implements IdempotencyRepository {
     const ttlEpoch = Math.floor(now.getTime() / 1000) + ttlSeconds;
     try {
       await this.doc.send(
-        new UpdateItemCommand({
+        new UpdateCommand({
           TableName: this.tableName,
           Key: idempotencyKey(chave),
           UpdateExpression:
@@ -114,7 +114,7 @@ export class DynamoDbIdempotencyRepository implements IdempotencyRepository {
 
   private async read(chave: string): Promise<StoredIdempotency | null> {
     const result = await this.doc.send(
-      new GetItemCommand({
+      new GetCommand({
         TableName: this.tableName,
         Key: idempotencyKey(chave),
         ConsistentRead: true,
