@@ -19,7 +19,9 @@
     "test": "jest --coverage",
     "test:unit": "jest tests/unit --coverage",
     "test:integration": "jest tests/integration --coverage",
-    "test:contract": "jest tests/contract --coverage"
+    "test:contract": "jest tests/contract --coverage",
+    "relay": "node dist/relay/outbox-relay.js",
+    "relay:dev": "tsx src/relay/outbox-relay.ts"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.750.0",
