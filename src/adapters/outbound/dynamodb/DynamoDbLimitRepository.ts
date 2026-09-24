@@ -3,8 +3,6 @@ import type {
   DynamoDBDocumentClient,
   TransactWriteCommandInput,
 } from '@aws-sdk/lib-dynamodb';
-
-type TransactWriteItem = NonNullable<TransactWriteCommandInput['TransactItems']>[number];
 import type { Contrato } from '../../../domain/entities/Contrato';
 import {
   ConflitoConcorrenciaError,
@@ -16,17 +14,15 @@ import type { LimitRepository } from '../../../application/ports/LimitRepository
 import type { ApplyAuthorizationInput } from '../../../application/ports/LimitRepository';
 import type { Logger } from '../../../application/ports/Logger';
 import {
-  authorizationKey,
   buildAuthorizationItem,
-  buildContractItem,
-  buildIdempotencyItem,
   buildOutboxItem,
   contractKey,
   idempotencyKey,
-  outboxKey,
   parseContractItem,
   TTL_ATTRIBUTE,
 } from './DynamoDbTable';
+
+type TransactWriteItem = NonNullable<TransactWriteCommandInput['TransactItems']>[number];
 
 const CONDITIONAL_CHECK_FAILED = 'ConditionalCheckFailed';
 const TRANSACTION_CONFLICT = 'TransactionConflictException';
