@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Configure npm auth for GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}" >> "${HOME}/.npmrc"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Start DynamoDB Local
+        run: |
+          docker run -d --rm --name ddb-local -p 8000:8000 \
+            amazon/dynamodb-local:2.5.2 -jar DynamoDBLocal.jar -sharedDb -inMemory
+          # aguarda o endpoint responder
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000 >/dev/null 2>&1 || \
+               docker exec ddb-local true >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+
+      - name: Create local tables
+        run: node scripts/init-local-tables.mjs
+        env:
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local
+          DYNAMODB_ENDPOINT: http://localhost:8000
+          DYNAMODB_TABLE: authorization-service
+          DYNAMODB_CHECKPOINT_TABLE: authorization-service-checkpoint
+
+      - name: Test with coverage (gate 80% domain+application)
+        run: npm test
+        env:
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: local
+          AWS_SECRET_ACCESS_KEY: local
+          DYNAMODB_ENDPOINT: http://localhost:8000
+          DYNAMODB_TABLE: authorization-service
+          DYNAMODB_CHECKPOINT_TABLE: authorization-service-checkpoint
+
+      - name: Build
+        run: npm run build
+
+      - name: Validate docker compose config
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > /tmp/ci.npmrc
+          NPMRC_PATH=/tmp/ci.npmrc docker compose config >/dev/null
+          NPMRC_PATH=/tmp/ci.npmrc docker compose -f docker-compose.test.yml config >/dev/null
+
+      - name: Build Docker images (api + relay)
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > /tmp/ci.npmrc
+          docker buildx build --secret id=npmrc,src=/tmp/ci.npmrc --target api -t authorization-service:ci-api --load .
+          docker buildx build --secret id=npmrc,src=/tmp/ci.npmrc --target relay -t authorization-service:ci-relay --load .

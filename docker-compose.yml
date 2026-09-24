@@ -1,0 +1,98 @@
+# Stack local do Authorization Service (ADR-002/006):
+#   dynamodb-local + elasticmq(SQS) + init(tabelas/filas) + api + relay.
+#
+# Build requer secret npmrc (auth do GitHub Packages p/ a dep privada):
+#   export NPMRC_PATH="$HOME/.npmrc"   # contém //npm.pkg.github.com/:_authToken=...
+#   docker compose up --build
+#
+# A API expõe a porta 3000. O relay publica via fan-out SQS local (elasticmq).
+
+x-build-base: &build-base
+  context: .
+  secrets:
+    - npmrc
+
+x-aws-env: &aws-env
+  AWS_REGION: us-east-1
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+
+x-persistence-env: &persistence-env
+  ADAPTER_MODE: dynamodb
+  DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+  DYNAMODB_TABLE: authorization-service
+  DYNAMODB_CHECKPOINT_TABLE: authorization-service-checkpoint
+  IDEMPOTENCY_TTL_SECONDS: "86400"
+
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.5.2
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8000 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  elasticmq:
+    image: softwaremill/elasticmq-native:1.6.11
+    ports:
+      - "9324:9324"
+
+  init:
+    build:
+      <<: *build-base
+      target: tools
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+      elasticmq:
+        condition: service_started
+    environment:
+      <<: [*aws-env, *persistence-env]
+      SQS_ENDPOINT: http://elasticmq:9324
+      LOCAL_QUEUE_NAMES: fraud-queue,accounting-queue,notification-queue
+    restart: "no"
+
+  api:
+    build:
+      <<: *build-base
+      target: api
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    environment:
+      <<: [*aws-env, *persistence-env]
+      SERVICE_NAME: authorization-service
+      PORT: "3000"
+      # API não publica eventos (quem publica é o relay via outbox); local-sqs
+      # evita instanciar cliente EventBridge apontando p/ AWS real.
+      RELAY_PUBLISHER: local-sqs
+      SQS_ENDPOINT: http://elasticmq:9324
+      CIRCUIT_BREAKER_FORCE_OPEN: "false"
+
+  relay:
+    build:
+      <<: *build-base
+      target: relay
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      <<: [*aws-env, *persistence-env]
+      SERVICE_NAME: authorization-service-relay
+      RELAY_PUBLISHER: local-sqs
+      SQS_ENDPOINT: http://elasticmq:9324
+      LOCAL_FANOUT_QUEUE_URLS: >-
+        http://elasticmq:9324/000000000000/fraud-queue,http://elasticmq:9324/000000000000/accounting-queue,http://elasticmq:9324/000000000000/notification-queue
+      RELAY_POLL_INTERVAL_MS: "1000"
+      RELAY_BATCH_SIZE: "100"
+
+secrets:
+  npmrc:
+    file: ${NPMRC_PATH:-$HOME/.npmrc}
