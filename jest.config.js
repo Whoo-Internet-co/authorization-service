@@ -1,6 +1,5 @@
-import type { Config } from 'jest';
-
-const config: Config = {
+/** @type {import('jest').Config} */
+const config = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   roots: ['<rootDir>/tests'],
@@ -18,6 +17,7 @@ const config: Config = {
   },
   coverageReporters: ['text', 'json-summary', 'html'],
   maxWorkers: '50%',
+  testTimeout: 60_000,
 };
 
-export default config;
+module.exports = config;

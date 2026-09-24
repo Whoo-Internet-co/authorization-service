@@ -9,6 +9,7 @@ import {
   buildIdempotencyItem,
   idempotencyKey,
   TTL_ATTRIBUTE,
+  ENTITY_ATTRIBUTE,
   ENTITY_IDEMPOTENCIA,
 } from './DynamoDbTable';
 
@@ -19,7 +20,7 @@ interface StoredIdempotency {
 }
 
 function parseIdempotencyItem(item: Record<string, unknown> | undefined): StoredIdempotency | null {
-  if (item === undefined || item[ENTITY_IDEMPOTENCIA] !== ENTITY_IDEMPOTENCIA) {
+  if (item === undefined || item[ENTITY_ATTRIBUTE] !== ENTITY_IDEMPOTENCIA) {
     return null;
   }
   return {
@@ -90,10 +91,10 @@ export class DynamoDbIdempotencyRepository implements IdempotencyRepository {
           TableName: this.tableName,
           Key: idempotencyKey(chave),
           UpdateExpression:
-            'SET #st = :concluida, response = :response, completed_at = :ts, #ttl = :ttl',
+            'SET #st = :concluida, #resp = :response, completed_at = :ts, #ttl = :ttl',
           ConditionExpression:
-            'attribute_exists(PK) AND request_hash = :hash AND attribute_not_exists(response)',
-          ExpressionAttributeNames: { '#st': 'status', '#ttl': TTL_ATTRIBUTE },
+            'attribute_exists(PK) AND request_hash = :hash AND attribute_not_exists(#resp)',
+          ExpressionAttributeNames: { '#st': 'status', '#ttl': TTL_ATTRIBUTE, '#resp': 'response' },
           ExpressionAttributeValues: {
             ':concluida': 'CONCLUIDA',
             ':response': JSON.stringify(response),
