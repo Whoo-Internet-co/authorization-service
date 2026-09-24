@@ -38,12 +38,18 @@ jobs:
         run: |
           docker run -d --rm --name ddb-local -p 8000:8000 \
             amazon/dynamodb-local:2.5.2 -jar DynamoDBLocal.jar -sharedDb -inMemory
-          # aguarda o endpoint responder
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:8000 >/dev/null 2>&1 || \
-               docker exec ddb-local true >/dev/null 2>&1; then break; fi
+          # DynamoDB Local responde HTTP 400 em GET / quando está no ar.
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000 || true)
+            if [ "$code" = "400" ] || [ "$code" = "200" ]; then
+              echo "DynamoDB Local ready (HTTP $code)"
+              exit 0
+            fi
             sleep 1
           done
+          echo "DynamoDB Local failed to become ready"
+          docker logs ddb-local || true
+          exit 1
 
       - name: Create local tables
         run: node scripts/init-local-tables.mjs

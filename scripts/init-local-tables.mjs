@@ -40,13 +40,17 @@ const log = (msg) => process.stdout.write(`[init-local] ${msg}\n`);
 /** Erros transitórios de conexão (serviço local ainda subindo). */
 function isConnectionError(err) {
   const msg = String(err?.message ?? err);
+  const name = String(err?.name ?? '');
   return (
     err?.name === 'ECONNREFUSED' ||
     err?.code === 'ECONNREFUSED' ||
+    name === 'TimeoutError' ||
     msg.includes('ECONNREFUSED') ||
     msg.includes('connect ECONNREFUSED') ||
     msg.includes('getaddrinfo') ||
-    msg.includes('ECONNRESET')
+    msg.includes('ECONNRESET') ||
+    msg.includes('socket hang up') ||
+    msg.includes('TimeoutError')
   );
 }
 
